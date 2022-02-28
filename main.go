@@ -4,17 +4,34 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+type IsoDate time.Time
+
+func (j *IsoDate) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), "\"")
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return err
+	}
+	*j = IsoDate(t)
+	return nil
+}
+
+func (j IsoDate) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Time(j).Format("2006-01-02"))
+}
 
 type Product struct {
 	ID    uuid.UUID `json:"id"`
 	Brand string    `json:"brand"`
 	Model string    `json:"model"`
 	Color string    `json:"color"`
-	Price string    `json:"price"`
+	Price float32   `json:"price"`
 }
 
 type ContractType string
@@ -27,8 +44,8 @@ const (
 type Contract struct {
 	ID        uuid.UUID    `json:"id"`
 	Type      ContractType `json:"type"`
-	StartDate time.Time    `json:"start_date"`
-	EndDate   time.Time    `json:"end_date"`
+	StartDate IsoDate      `json:"start_date"`
+	EndDate   IsoDate      `json:"end_date"`
 }
 
 type Warranty struct {
@@ -37,25 +54,22 @@ type Warranty struct {
 	Contract `json:"contract"`
 }
 
-func NewWarranty(req *http.Request) Warranty {
-	warranty := Warranty{
-		ID: uuid.New(),
-		Product: Product{
-			ID:    uuid.New(),
-			Brand: "something",
-			Model: "something",
-			Color: "something",
-			Price: "something",
-		},
-		Contract: Contract{
-			ID:        uuid.New(),
-			Type:      StandardContract,
-			StartDate: time.Time{},
-			EndDate:   time.Time{},
-		},
+func NewWarranty(w http.ResponseWriter, req *http.Request) (Warranty, error) {
+	var warranty Warranty
+
+	decoder := json.NewDecoder(req.Body)
+
+	err := decoder.Decode(&warranty)
+	if err != nil {
+		fmt.Println(err)
+		return warranty, err
 	}
 
-	return warranty
+	warranty.ID = uuid.New()
+	warranty.Product.ID = uuid.New()
+	warranty.Contract.ID = uuid.New()
+
+	return warranty, nil
 }
 
 func (warranty Warranty) Save() {
@@ -80,7 +94,7 @@ func serializeWarranty(w http.ResponseWriter, warranty Warranty) {
 	fmt.Fprint(w, string(warrantyJson))
 }
 
-func returnWarranties(w http.ResponseWriter, warranties []Warranty) {
+func serializeWarranties(w http.ResponseWriter, warranties []Warranty) {
 	for _, warranty := range warranties {
 		serializeWarranty(w, warranty)
 	}
@@ -89,13 +103,17 @@ func returnWarranties(w http.ResponseWriter, warranties []Warranty) {
 func Warranties(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case "POST":
-		warranty := NewWarranty(req)
+		warranty, err := NewWarranty(w, req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		warranty.Save()
 		serializeWarranty(w, warranty)
 
 	case "GET":
 		warranties := getWarranties()
-		returnWarranties(w, warranties)
+		serializeWarranties(w, warranties)
 
 	default:
 		http.Error(w, fmt.Sprintf("Method %v not supported.", req.Method), http.StatusNotFound)
