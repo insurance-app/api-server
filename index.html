@@ -1,0 +1,20 @@
+<h1>My Warranties</h1>
+<ol>
+    {{range .}}
+    <li>
+        <ul> <b>Product</b>
+            <ul><b>Brand:</b> {{.Brand}}</ul>
+            <ul><b>Model:</b> {{.Model}}</ul>
+            <ul><b>Color:</b> {{.Color}}</ul>
+            <ul><b>Price:</b> {{.Price}}</ul>
+        </ul>
+        <br>
+        <ul> <b>Contract</b>
+            <ul><b>Type:</b> {{.Type}}</ul>
+            <ul><b>Start Date:</b> {{.StartDate}}</ul>
+            <ul><b>End Date:</b> {{.EndDate}}</ul>
+        </ul>
+    </li>
+    <br>
+    {{end}}
+</ol>

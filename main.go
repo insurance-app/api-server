@@ -3,12 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+var warranties = make([]Warranty, 0)
 
 type IsoDate time.Time
 
@@ -23,7 +26,11 @@ func (j *IsoDate) UnmarshalJSON(b []byte) error {
 }
 
 func (j IsoDate) MarshalJSON() ([]byte, error) {
-	return json.Marshal(time.Time(j).Format("2006-01-02"))
+	return json.Marshal(j.String())
+}
+
+func (j IsoDate) String() string {
+	return time.Time(j).Format("2006-01-02")
 }
 
 type Product struct {
@@ -76,8 +83,6 @@ func (warranty Warranty) Save() {
 	warranties = append(warranties, warranty)
 }
 
-var warranties = make([]Warranty, 0)
-
 func getWarranties() []Warranty {
 	return warranties
 }
@@ -121,11 +126,21 @@ func Warranties(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func GetWarranties(w http.ResponseWriter, req *http.Request) {
+func Home(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case "GET":
+		warranties := getWarranties()
+		tmpl := template.Must(template.ParseFiles("index.html"))
+		tmpl.Execute(w, warranties)
 
+	default:
+		http.Error(w, fmt.Sprintf("Method %v not supported.", req.Method), http.StatusNotFound)
+		return
+	}
 }
 
 func main() {
 	http.HandleFunc("/warranties", Warranties)
+	http.HandleFunc("/", Home)
 	http.ListenAndServe(":8080", nil)
 }
