@@ -5,64 +5,15 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"strings"
-	"time"
 
+	"github.com/MrNeocore/sunrise-api-server/warranty"
 	"github.com/google/uuid"
 )
 
-var warranties = make([]Warranty, 0)
+var warranties = make([]warranty.Warranty, 0)
 
-type IsoDate time.Time
-
-func (j *IsoDate) UnmarshalJSON(b []byte) error {
-	s := strings.Trim(string(b), "\"")
-	t, err := time.Parse("2006-01-02", s)
-	if err != nil {
-		return err
-	}
-	*j = IsoDate(t)
-	return nil
-}
-
-func (j IsoDate) MarshalJSON() ([]byte, error) {
-	return json.Marshal(j.String())
-}
-
-func (j IsoDate) String() string {
-	return time.Time(j).Format("2006-01-02")
-}
-
-type Product struct {
-	ID    uuid.UUID `json:"id"`
-	Brand string    `json:"brand"`
-	Model string    `json:"model"`
-	Color string    `json:"color"`
-	Price float32   `json:"price"`
-}
-
-type ContractType string
-
-const (
-	StandardContract ContractType = "standard"
-	PremiumContract  ContractType = "premium"
-)
-
-type Contract struct {
-	ID        uuid.UUID    `json:"id"`
-	Type      ContractType `json:"type"`
-	StartDate IsoDate      `json:"start_date"`
-	EndDate   IsoDate      `json:"end_date"`
-}
-
-type Warranty struct {
-	ID       uuid.UUID `json:"id"`
-	Product  `json:"product"`
-	Contract `json:"contract"`
-}
-
-func NewWarranty(w http.ResponseWriter, req *http.Request) (Warranty, error) {
-	var warranty Warranty
+func NewWarranty(w http.ResponseWriter, req *http.Request) (warranty.Warranty, error) {
+	var warranty warranty.Warranty
 
 	decoder := json.NewDecoder(req.Body)
 
@@ -79,15 +30,15 @@ func NewWarranty(w http.ResponseWriter, req *http.Request) (Warranty, error) {
 	return warranty, nil
 }
 
-func (warranty Warranty) Save() {
-	warranties = append(warranties, warranty)
-}
-
-func getWarranties() []Warranty {
+func getWarranties() []warranty.Warranty {
 	return warranties
 }
 
-func serializeWarranty(w http.ResponseWriter, warranty Warranty) {
+func saveWarranties(warranty warranty.Warranty) {
+	warranties = append(warranties, warranty)
+}
+
+func serializeWarranty(w http.ResponseWriter, warranty warranty.Warranty) {
 	warrantyJson, err := json.MarshalIndent(warranty, "", "    ")
 
 	if err != nil {
@@ -99,7 +50,7 @@ func serializeWarranty(w http.ResponseWriter, warranty Warranty) {
 	fmt.Fprint(w, string(warrantyJson))
 }
 
-func serializeWarranties(w http.ResponseWriter, warranties []Warranty) {
+func serializeWarranties(w http.ResponseWriter, warranties []warranty.Warranty) {
 	for _, warranty := range warranties {
 		serializeWarranty(w, warranty)
 	}
@@ -113,7 +64,7 @@ func Warranties(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		warranty.Save()
+		saveWarranties(warranty)
 		serializeWarranty(w, warranty)
 
 	case "GET":
